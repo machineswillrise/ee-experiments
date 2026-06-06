@@ -42,6 +42,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 
 import lombok.SneakyThrows;
 
@@ -62,12 +63,12 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-record Order(@NotBlank String name, @NotBlank String product, @NotNull @Min(1)BigDecimal price) {}
+record Order(@NotBlank String name, @NotBlank String product, @NotNull @Min(1)BigDecimal price, Timestamp timestamp) {}
 
 class OrderServlet extends HttpServlet {
 	private final Connection connection;
 
-	private final Mapper mapper = new MapperBuilder().build();
+	private final Mapper mapper = new MapperBuilder().setAccessModeName("method").build();
 	private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
 	private final Validator validator = factory.getValidator();
 
@@ -79,7 +80,10 @@ class OrderServlet extends HttpServlet {
 		String name = req.getParameter("name");
 		String product = req.getParameter("product");
 		BigDecimal price = new BigDecimal(req.getParameter("price"));
-		Order order = new Order(name, product, price);
+
+		long timestampMillis = Long.parseLong(req.getParameter("timestamp"));
+		Timestamp timestamp = new Timestamp(timestampMillis);
+		Order order = new Order(name, product, price, timestamp);
 
 		return order;
 	}
@@ -93,7 +97,14 @@ class OrderServlet extends HttpServlet {
 		return true;
 	}
 
-	// these could either be propagated or handled, but the HttpServlet class
+	private void setUpStmt(Order order, PreparedStatement stmt) throws SQLException {
+		stmt.setString(1, order.name());
+		stmt.setString(2, order.product());
+		stmt.setBigDecimal(3, order.price());
+		stmt.setTimestamp(4, order.timestamp());
+	}
+
+	// these could normally either be propagated or handled, but the HttpServlet class
 	// requires them to only throw a certain set of exceptions and handling them
 	// would be verbose so @SneakyThrows is used
 	@Override
@@ -102,11 +113,12 @@ class OrderServlet extends HttpServlet {
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
 		List<Order> orders = new ArrayList<>();
-		try (PreparedStatement stmt = connection.prepareStatement("SELECT name, product, price FROM orders");
+		try (PreparedStatement stmt = connection.prepareStatement("SELECT name, product, price, timestamp FROM orders");
 			ResultSet rs = stmt.executeQuery()) {
 			while (rs.next()) {
 				orders.add(
-					new Order(rs.getString("name"), rs.getString("product"), rs.getBigDecimal("price"))
+					new Order(rs.getString("name"), rs.getString("product"),
+						rs.getBigDecimal("price"), rs.getTimestamp("timestamp"))
 				);
 			}
 		}
@@ -125,10 +137,8 @@ class OrderServlet extends HttpServlet {
 		}
 
 		try (PreparedStatement stmt = connection.prepareStatement(
-				"INSERT INTO orders (name, product, price) VALUES (?, ?, ?)")) {
-			stmt.setString(1, order.name());
-			stmt.setString(2, order.product());
-			stmt.setBigDecimal(3, order.price());
+				"INSERT INTO orders (name, product, price, timestamp) VALUES (?, ?, ?, ?)")) {
+			setUpStmt(order, stmt);
 			stmt.execute();
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
@@ -144,9 +154,8 @@ class OrderServlet extends HttpServlet {
 		}
 
 		try (PreparedStatement stmt = connection.prepareStatement(
-				"DELETE FROM orders WHERE name = ? AND product = ?")) {
-			stmt.setString(1, order.name());
-			stmt.setString(2, order.product());
+				"DELETE FROM orders WHERE name = ? AND product = ? AND price = ? AND timestamp = ?")) {
+			setUpStmt(order, stmt);
 			stmt.execute();
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
@@ -214,7 +223,7 @@ public class Restaurant {
 			connection = DriverManager.getConnection("jdbc:sqlite:restaurant.db");
 			statement = connection.createStatement();
 			statement.setQueryTimeout(10);
-			statement.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, product TEXT, price DECIMAL)");
+			statement.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, product TEXT, price DECIMAL, timestamp TIMESTAMP)");
 		} catch (SQLException e) {
 			LOG.error("Database Connection Error: " + e.getMessage());
 			return;

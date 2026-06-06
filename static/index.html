@@ -26,7 +26,9 @@
 			ordersList.innerHTML = "";
 			for (const order of orders) {
 				const li = document.createElement("li");
-				li.textContent = `${order.name} ordered ${order.product} - $${order.price}`;
+				li.textContent = `
+					${order.name} ordered ${order.product} - $${order.price} at ${new Date(order.timestamp.time).toLocaleDateString("en-CA")}
+				`;
 				
 				const deleteBtn = document.createElement("img");
 				deleteBtn.src = "img/delete.png";
@@ -36,7 +38,7 @@
 				deleteBtn.style.verticalAlign = "middle";
 
 				deleteBtn.addEventListener("click", () => {
-					fetch(`/orders?name=${order.name}&product=${order.product}&price=${order.price}`, {
+					fetch(`/orders?name=${order.name}&product=${order.product}&price=${order.price}&timestamp=${order.timestamp}`, {
 						method: "DELETE"
 					})
 					.then(fetchOrders)
@@ -59,7 +61,9 @@
 			const name = document.getElementById("name").value;
 			const product = document.getElementById("product").value;
 			const price = document.getElementById("price").value;
-			fetch(`/orders?name=${name}&product=${product}&price=${price}`, {
+			const now = new Date().getTime();
+
+			fetch(`/orders?name=${name}&product=${product}&price=${price}&timestamp=${now}`, {
 				method: "POST"
 			})
 			.then(fetchOrders)
