@@ -10,6 +10,7 @@
 		<p>Welcome to our restaurant!</p>
 		<input type="text" id="customer" name="customer" placeholder="Customer" required>
 		<input type="text" id="product" name="product" placeholder="Product" required>
+		<input type="number" id="price" name="price" placeholder="Price" step="0.01" min="0" required>
 		<button type="submit">Add Order</button>
 		<button type="reset">Reset</button>
 		<ul id="orders"></ul>
@@ -25,7 +26,7 @@
 			ordersList.innerHTML = "";
 			for (const order of orders) {
 				const li = document.createElement("li");
-				li.textContent = `${order.customer} ordered ${order.product}`;
+				li.textContent = `${order.customer} ordered ${order.product} - $${order.price}`;
 				
 				const deleteBtn = document.createElement("img");
 				deleteBtn.src = "img/delete.png";
@@ -57,7 +58,8 @@
 			event.preventDefault();
 			const customer = document.getElementById("customer").value;
 			const product = document.getElementById("product").value;
-			fetch(`/orders?customer=${customer}&product=${product}`, {
+			const price = document.getElementById("price").value;
+			fetch(`/orders?customer=${customer}&product=${product}&price=${price}`, {
 				method: "POST"
 			})
 			.then(fetchOrders)
