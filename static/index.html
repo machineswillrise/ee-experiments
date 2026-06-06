@@ -36,7 +36,7 @@
 				deleteBtn.style.verticalAlign = "middle";
 
 				deleteBtn.addEventListener("click", () => {
-					fetch(`/orders?customer=${order.customer}&product=${order.product}`, {
+					fetch(`/orders?customer=${order.customer}&product=${order.product}&price=${order.price}`, {
 						method: "DELETE"
 					})
 					.then(fetchOrders)

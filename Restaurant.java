@@ -6,13 +6,25 @@
 //DEPS org.glassfish:jakarta.json:2.0.1
 //DEPS org.slf4j:slf4j-simple:2.0.16
 //DEPS org.xerial:sqlite-jdbc:3.50.2.0
+//DEPS jakarta.validation:jakarta.validation-api:3.1.1
+//DEPS org.hibernate.validator:hibernate-validator:8.0.2.Final
 //DEPS org.projectlombok:lombok:1.18.40
+//DEPS org.glassfish:jakarta.el:4.0.0
 
 import jakarta.servlet.ServletException;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import jakarta.validation.Validator;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.ConstraintViolation;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -22,6 +34,7 @@ import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -49,11 +62,12 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-record Order(String customer, String product, BigDecimal price) {}
+record Order(@NotBlank String customer, @NotBlank String product, @NotNull @Min(1)BigDecimal price) {}
 
 class OrderServlet extends HttpServlet {
 	private final Connection connection;
 	private final Mapper mapper = new MapperBuilder().build();
+	private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
 	public OrderServlet(Connection connection) {
 		this.connection = connection;
@@ -62,14 +76,21 @@ class OrderServlet extends HttpServlet {
 	private Order extractFromParams(HttpServletRequest req) {
 		String customer = req.getParameter("customer");
 		String product = req.getParameter("product");
+		BigDecimal price = new BigDecimal(req.getParameter("price"));
+		Order order = new Order(customer, product, price);
 
-		String priceStr = req.getParameter("price");
-		BigDecimal price = priceStr != null ? new BigDecimal(priceStr) : BigDecimal.ZERO;
-		return new Order(customer, product, price);
+		Set<ConstraintViolation<Order>> violations = validator.validate(order);
+		if (!violations.isEmpty()) {
+			throw new IllegalArgumentException(violations.iterator().next().getMessage());
+		}
+		return order;
 	}
 
+	// these could either be propagated or handled, but the HttpServlet interface
+	// requires them to only throw a certain set of exceptions and handling them
+	// would be verbose so @SneakyThrows is used
 	@Override
-	@SneakyThrows(SQLException.class)
+	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
@@ -88,7 +109,7 @@ class OrderServlet extends HttpServlet {
 	}
 
 	@Override
-	@SneakyThrows(SQLException.class)
+	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
@@ -103,7 +124,7 @@ class OrderServlet extends HttpServlet {
 	}
 
 	@Override
-	@SneakyThrows(SQLException.class)
+	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
@@ -173,7 +194,7 @@ public class Restaurant {
 			connection = DriverManager.getConnection("jdbc:sqlite:restaurant.db");
 			statement = connection.createStatement();
 			statement.setQueryTimeout(10);
-			statement.execute("CREATE TABLE IF NOT EXISTS orders (name TEXT, product TEXT, price DECIMAL)");
+			statement.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, product TEXT, price DECIMAL)");
 		} catch (SQLException e) {
 			LOG.error("Database Connection Error: " + e.getMessage());
 			return;
