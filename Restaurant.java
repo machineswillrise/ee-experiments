@@ -8,17 +8,11 @@
 //DEPS org.xerial:sqlite-jdbc:3.50.2.0
 //DEPS org.projectlombok:lombok:1.18.40
 
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.FilterConfig;
 import jakarta.servlet.ServletException;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -41,7 +35,6 @@ import lombok.SneakyThrows;
 import org.apache.johnzon.mapper.Mapper;
 import org.apache.johnzon.mapper.MapperBuilder;
 
-import org.eclipse.jetty.ee10.servlet.FilterHolder;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 
@@ -124,28 +117,6 @@ class OrderServlet extends HttpServlet {
 	}
 }
 
-class MyFilter implements Filter {
-	public MyFilter() {
-	}
-
-	@Override
-	public void init(FilterConfig filterConfig) throws ServletException {
-		// ...
-	}
-
-	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-	throws IOException, ServletException {
-		HttpServletResponse httpResponse = (HttpServletResponse) response;
-		chain.doFilter(request, httpResponse);
-	}
-
-	@Override
-	public void destroy() {
-		// ...
-	}
-}
-
 record InitResult(Server server, ServletContextHandler context) {}
 
 public class Restaurant {
@@ -182,13 +153,6 @@ public class Restaurant {
 		LOG.info("Configured static file serving!");
 	}
 
-	private static void configureFilter(InitResult result, Filter filterInstance, String route) {
-		FilterHolder holder = new FilterHolder(filterInstance);
-		holder.setName(filterInstance.getClass().getSimpleName());
-		result.context().addFilter(holder, route, null);
-
-		LOG.info("Configured Filters!");
-	}
 
 	private static void close(Statement statement, Connection connection) {
 		try {
@@ -217,7 +181,6 @@ public class Restaurant {
 
 		try {
 			result = init(new OrderServlet(connection), ROUTE, PORT);
-			configureFilter(result, new MyFilter(), ROUTE);
 			configureStaticFiles(result.context(), STATIC_FILE_PATH);
 			server = result.server();
 		} catch (Exception e) {
