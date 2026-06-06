@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Restaurant</title>
+</head>
+<body>
+    <h1>Restaurant</h1>
+    <p>Welcome to our restaurant!</p>
+    <form id="orderForm" action="/orders" method="post">
+        <input type="text" id="customer" name="customer" placeholder="Customer">
+        <input type="text" id="product" name="product" placeholder="Product">
+        <button type="submit">Add Order</button>
+        <button type="reset">Reset</button>
+    </form>
+    
+    <ul id="orders"></ul>
+    <script>
+        const form = document.getElementById("orderForm");
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            const customer = document.getElementById("customer").value;
+            const product = document.getElementById("product").value;
+            fetch(`/orders?customer=${customer}&product=${product}`, {
+                method: "POST"
+            })
+            .then(() => fetch("/orders"))
+            .then(response => response.json())
+            .then(response => {
+                const ordersList = document.getElementById("orders");
+                ordersList.innerHTML = "";
+                for (const order of response) {
+                    const li = document.createElement("li");
+                    li.textContent = `${order.customer} ordered ${order.product}`;
+                    ordersList.appendChild(li);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

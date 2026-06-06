@@ -1,45 +1,62 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //DEPS org.eclipse.jetty.ee10:jetty-ee10-servlet:12.1.10
+//DEPS org.eclipse.jetty.ee10:jetty-ee10-servlets:12.1.10
+//DEPS org.eclipse.jetty:jetty-server:12.1.10
+//DEPS org.apache.johnzon:johnzon-mapper:2.1.0
+//DEPS org.glassfish:jakarta.json:2.0.1
 //DEPS org.slf4j:slf4j-simple:2.0.16
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.FilterConfig;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import jakarta.servlet.ServletException;
-
-import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
-import org.eclipse.jetty.ee10.servlet.ServletHolder;
-import org.eclipse.jetty.ee10.servlet.FilterHolder;
-
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 
+import java.nio.file.Path;
+
+import java.lang.reflect.InvocationTargetException;
+
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.johnzon.mapper.Mapper;
+import org.apache.johnzon.mapper.MapperBuilder;
+
+import org.eclipse.jetty.ee10.servlet.FilterHolder;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
+
+import org.eclipse.jetty.server.handler.ResourceHandler;
+
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.InvocationTargetException;
-
 record Order(String customer, String product) {}
 
 class OrderServlet extends HttpServlet {
-	private static final List<Order> orders = List.of(
-		new Order("Bob", "Water"),
-		new Order("Bill", "Tea"),
-		new Order("Jane", "Coffee")
+	private final List<Order> orders = new ArrayList<>(
+		List.of(
+			new Order("Bob", "Water"),
+			new Order("Bill", "Tea"),
+			new Order("Jane", "Coffee")
+		)
 	);
+	private final Mapper mapper = new MapperBuilder().build();	
 
 	private Order extractFromParams(HttpServletRequest req) {
 		String customer = req.getParameter("customer");
@@ -50,18 +67,14 @@ class OrderServlet extends HttpServlet {
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
-		resp.setContentType("text/plain");
-		PrintWriter writer = resp.getWriter();
-
-		for (Order order : orders) {
-			writer.println(order.customer() + ": " + order.product());
+		resp.setContentType("application/json");
+		try (PrintWriter writer = resp.getWriter()) {
+			mapper.writeObject(orders, writer);
 		}
-
-		writer.flush();
 	}
 
 	@Override
-	protected void doPut(HttpServletRequest req, HttpServletResponse resp)
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
 		orders.add(order);
@@ -116,7 +129,7 @@ class InitResult {
 		return context;
 	}
 
-	public void setContext() {
+	public void setContext(ServletContextHandler context) {
 		this.context = context;
 	}
 }
@@ -126,6 +139,7 @@ public class Restaurant {
 
 	private static final String ROUTE = "/orders";
 	private static final int PORT = 8080;
+	private static final Path STATIC_FILE_PATH = Path.of("static");
 
 	private static InitResult init(Class<?> servlet, String route, int port)
 	throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
@@ -147,6 +161,15 @@ public class Restaurant {
 		return new InitResult(server, context);
 	}
 
+	private static void configureStaticFiles(ServletContextHandler context, Path staticPath) {
+		ResourceHandler resourceHandler = new ResourceHandler();
+		Resource base = ResourceFactory.of(resourceHandler).newResource(staticPath);
+		resourceHandler.setBaseResource(base);
+		context.insertHandler(resourceHandler);
+
+		LOG.info("Configured static file serving!");
+	}
+
 	private static void configureFilter(InitResult result, Filter filterInstance, String route) {
 		FilterHolder holder = new FilterHolder(filterInstance);
 		holder.setName(filterInstance.getClass().getSimpleName());
@@ -162,9 +185,10 @@ public class Restaurant {
 		try {
 			result = init(OrderServlet.class, ROUTE, PORT);
 			configureFilter(result, new MyFilter(), ROUTE);
+			configureStaticFiles(result.getContext(), STATIC_FILE_PATH);
 			server = result.getServer();
 		} catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-			LOG.error("Jetty Configuration Error: " + e.getMessage());
+			LOG.error("Jetty Configuration Error", e);
 			return;
 		}
 
