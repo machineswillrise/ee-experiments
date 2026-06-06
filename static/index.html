@@ -2,18 +2,19 @@
 <html>
 <head>
     <title>Restaurant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Restaurant</h1>
-    <p>Welcome to our restaurant!</p>
     <form id="orderForm" action="/orders" method="post">
+        <h1>Restaurant</h1>
+        <p>Welcome to our restaurant!</p>
         <input type="text" id="customer" name="customer" placeholder="Customer">
         <input type="text" id="product" name="product" placeholder="Product">
         <button type="submit">Add Order</button>
         <button type="reset">Reset</button>
+        <ul id="orders"></ul>
     </form>
     
-    <ul id="orders"></ul>
     <script>
         const form = document.getElementById("orderForm");
         form.addEventListener("submit", event => {
