@@ -17,57 +17,63 @@ import jakarta.servlet.ServletException;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.ee10.servlet.FilterHolder;
+
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 
+record Order(String customer, String product) {}
+
 class OrderServlet extends HttpServlet {
-	private Map<String, String> storeOrders = new HashMap<>() {{
-		put("John", "Water");
-		put("Jane", "Coffee");
-		put("Bob", "Tea");
-	}};
+	private static final List<Order> orders = List.of(
+		new Order("Bob", "Water"),
+		new Order("Bill", "Tea"),
+		new Order("Jane", "Coffee")
+	);
+
+	private Order extractFromParams(HttpServletRequest req) {
+		String customer = req.getParameter("customer");
+		String product = req.getParameter("product");
+		return new Order(customer, product);
+	}
 
 	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		StringBuilder html = new StringBuilder();
-		html.append(
-			"""
-			<html>
-				<body>
-					<h1>Orders</h1>
-					<ul>
-			"""
-		);
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+	throws ServletException, IOException {
+		resp.setContentType("text/plain");
+		PrintWriter writer = resp.getWriter();
 
-		for (Map.Entry<String, String> entry : storeOrders.entrySet()) {
-			String customer = entry.getKey();
-			String product = entry.getValue();
-
-			html.append("<li>\n")
-				.append("\t").append(customer).append(": ")
-				.append(product).append("\n")
-				.append("</li>\n");
+		for (Order order : orders) {
+			writer.println(order.customer() + ": " + order.product());
 		}
 
-		html.append(
-			"""
-					</ul>
-				</body>
-			</html>
-			"""
-		);
-		
-		resp.getWriter().println(html);
+		writer.flush();
+	}
+
+	@Override
+	protected void doPut(HttpServletRequest req, HttpServletResponse resp)
+	throws ServletException, IOException {
+		Order order = extractFromParams(req);
+		orders.add(order);
+		resp.setStatus(HttpServletResponse.SC_OK);
+	}
+
+	@Override
+	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
+	throws ServletException, IOException {
+		Order order = extractFromParams(req);
+		orders.remove(order);
+		resp.setStatus(HttpServletResponse.SC_OK);
 	}
 }
 
