@@ -16,6 +16,42 @@
     </form>
     
     <script>
+        function fetchOrders() {
+            return fetch("/orders").then(response => response.json());
+        }
+
+        function renderOrders(orders) {
+            const ordersList = document.getElementById("orders");
+            ordersList.innerHTML = "";
+            for (const order of orders) {
+                const li = document.createElement("li");
+                li.textContent = `${order.customer} ordered ${order.product}`;
+                
+                const deleteBtn = document.createElement("img");
+                deleteBtn.src = "img/delete.png";
+                deleteBtn.style.width = "16px";
+                deleteBtn.style.height = "16px";
+                deleteBtn.style.cursor = "pointer";
+                deleteBtn.style.verticalAlign = "middle";
+
+                deleteBtn.addEventListener("click", () => {
+                    fetch(`/orders?customer=${order.customer}&product=${order.product}`, {
+                        method: "DELETE"
+                    })
+                    .then(fetchOrders)
+                    .then(renderOrders);
+                });
+                li.appendChild(deleteBtn);
+                
+                const span = document.createElement("span");
+                span.style.marginLeft = "5px";
+                span.appendChild(deleteBtn);
+                li.appendChild(span);
+                
+                ordersList.appendChild(li);
+            }
+        }
+
         const form = document.getElementById("orderForm");
         form.addEventListener("submit", event => {
             event.preventDefault();
@@ -24,17 +60,8 @@
             fetch(`/orders?customer=${customer}&product=${product}`, {
                 method: "POST"
             })
-            .then(() => fetch("/orders"))
-            .then(response => response.json())
-            .then(response => {
-                const ordersList = document.getElementById("orders");
-                ordersList.innerHTML = "";
-                for (const order of response) {
-                    const li = document.createElement("li");
-                    li.textContent = `${order.customer} ordered ${order.product}`;
-                    ordersList.appendChild(li);
-                }
-            });
+            .then(fetchOrders)
+            .then(renderOrders);
         });
     </script>
 </body>
