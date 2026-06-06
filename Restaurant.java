@@ -146,27 +146,7 @@ class MyFilter implements Filter {
 	}
 }
 
-class InitResult {
-	private final Server server;
-	private ServletContextHandler context;
-
-	public InitResult(Server server, ServletContextHandler context) {
-		this.server = server;
-		this.context = context;
-	}
-
-	public Server getServer() {
-		return server;
-	}
-
-	public ServletContextHandler getContext() {
-		return context;
-	}
-
-	public void setContext(ServletContextHandler context) {
-		this.context = context;
-	}
-}
+record InitResult(Server server, ServletContextHandler context) {}
 
 public class Restaurant {
 	private static final Logger LOG = LoggerFactory.getLogger(Restaurant.class);
@@ -205,7 +185,7 @@ public class Restaurant {
 	private static void configureFilter(InitResult result, Filter filterInstance, String route) {
 		FilterHolder holder = new FilterHolder(filterInstance);
 		holder.setName(filterInstance.getClass().getSimpleName());
-		result.getContext().addFilter(holder, route, null);
+		result.context().addFilter(holder, route, null);
 
 		LOG.info("Configured Filters!");
 	}
@@ -238,8 +218,8 @@ public class Restaurant {
 		try {
 			result = init(new OrderServlet(connection), ROUTE, PORT);
 			configureFilter(result, new MyFilter(), ROUTE);
-			configureStaticFiles(result.getContext(), STATIC_FILE_PATH);
-			server = result.getServer();
+			configureStaticFiles(result.context(), STATIC_FILE_PATH);
+			server = result.server();
 		} catch (Exception e) {
 			LOG.error("Jetty Configuration Error", e);
 			return;
