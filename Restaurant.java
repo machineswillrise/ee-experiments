@@ -31,6 +31,7 @@ import java.util.List;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -80,8 +81,8 @@ class OrderServlet extends HttpServlet {
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
 		List<Order> orders = new ArrayList<>();
-		try (Statement stmt = connection.createStatement();
-			ResultSet rs = stmt.executeQuery("SELECT name, product, price FROM orders")) {
+		try (PreparedStatement stmt = connection.prepareStatement("SELECT name, product, price FROM orders");
+			ResultSet rs = stmt.executeQuery()) {
 			while (rs.next()) {
 				orders.add(
 					new Order(rs.getString("name"), rs.getString("product"), rs.getBigDecimal("price"))
@@ -98,9 +99,12 @@ class OrderServlet extends HttpServlet {
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
-		try (Statement stmt = connection.createStatement()) {
-			stmt.execute(String.format("INSERT INTO orders (name, product, price) VALUES ('%s', '%s', %s)",
-				order.customer(), order.product(), order.price()));
+		try (PreparedStatement stmt = connection.prepareStatement(
+				"INSERT INTO orders (name, product, price) VALUES (?, ?, ?)")) {
+			stmt.setString(1, order.customer());
+			stmt.setString(2, order.product());
+			stmt.setBigDecimal(3, order.price());
+			stmt.execute();
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
 	}
@@ -110,9 +114,11 @@ class OrderServlet extends HttpServlet {
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
-		try (Statement stmt = connection.createStatement()) {
-			stmt.execute(String.format("DELETE FROM orders WHERE name = '%s' AND product = '%s'",
-				order.customer(), order.product()));
+		try (PreparedStatement stmt = connection.prepareStatement(
+				"DELETE FROM orders WHERE name = ? AND product = ?")) {
+			stmt.setString(1, order.customer());
+			stmt.setString(2, order.product());
+			stmt.execute();
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
 	}
