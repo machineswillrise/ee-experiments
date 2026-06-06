@@ -62,35 +62,42 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-record Order(@NotBlank String customer, @NotBlank String product, @NotNull @Min(1)BigDecimal price) {}
+record Order(@NotBlank String name, @NotBlank String product, @NotNull @Min(1)BigDecimal price) {}
 
 class OrderServlet extends HttpServlet {
 	private final Connection connection;
+
 	private final Mapper mapper = new MapperBuilder().build();
-	private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+	private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+	private final Validator validator = factory.getValidator();
 
 	public OrderServlet(Connection connection) {
 		this.connection = connection;
 	}	
 
 	private Order extractFromParams(HttpServletRequest req) {
-		String customer = req.getParameter("customer");
+		String name = req.getParameter("name");
 		String product = req.getParameter("product");
 		BigDecimal price = new BigDecimal(req.getParameter("price"));
-		Order order = new Order(customer, product, price);
+		Order order = new Order(name, product, price);
 
-		Set<ConstraintViolation<Order>> violations = validator.validate(order);
-		if (!violations.isEmpty()) {
-			throw new IllegalArgumentException(violations.iterator().next().getMessage());
-		}
 		return order;
 	}
 
-	// these could either be propagated or handled, but the HttpServlet interface
+	private boolean validate(Order order, HttpServletResponse response) {
+		Set<ConstraintViolation<Order>> violations = validator.validate(order);
+		if (!violations.isEmpty()) {
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			return false;
+		}
+		return true;
+	}
+
+	// these could either be propagated or handled, but the HttpServlet class
 	// requires them to only throw a certain set of exceptions and handling them
 	// would be verbose so @SneakyThrows is used
 	@Override
-	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
+	@SneakyThrows(SQLException.class)
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
@@ -109,13 +116,17 @@ class OrderServlet extends HttpServlet {
 	}
 
 	@Override
-	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
+	@SneakyThrows(SQLException.class)
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
+		if (!validate(order, resp)) {
+			return;
+		}
+
 		try (PreparedStatement stmt = connection.prepareStatement(
 				"INSERT INTO orders (name, product, price) VALUES (?, ?, ?)")) {
-			stmt.setString(1, order.customer());
+			stmt.setString(1, order.name());
 			stmt.setString(2, order.product());
 			stmt.setBigDecimal(3, order.price());
 			stmt.execute();
@@ -124,17 +135,25 @@ class OrderServlet extends HttpServlet {
 	}
 
 	@Override
-	@SneakyThrows({SQLException.class, IllegalArgumentException.class})
+	@SneakyThrows(SQLException.class)
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
+		if (!validate(order, resp)) {
+			return;
+		}
+
 		try (PreparedStatement stmt = connection.prepareStatement(
 				"DELETE FROM orders WHERE name = ? AND product = ?")) {
-			stmt.setString(1, order.customer());
+			stmt.setString(1, order.name());
 			stmt.setString(2, order.product());
 			stmt.execute();
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
+	}
+
+	public void closeValidator() {
+		factory.close();
 	}
 }
 
@@ -187,6 +206,7 @@ public class Restaurant {
 	public static void main(String[] args) {
 		InitResult result;
 		Server server;
+		OrderServlet servlet;
 
 		Connection connection;
 		Statement statement;
@@ -201,7 +221,8 @@ public class Restaurant {
 		}
 
 		try {
-			result = init(new OrderServlet(connection), ROUTE, PORT);
+			servlet = new OrderServlet(connection);
+			result = init(servlet, ROUTE, PORT);
 			configureStaticFiles(result.context(), STATIC_FILE_PATH);
 			server = result.server();
 		} catch (Exception e) {
@@ -217,6 +238,7 @@ public class Restaurant {
 			LOG.error("Jetty Error: " + e.getMessage());
 		} finally {
 			close(statement, connection);
+			servlet.closeValidator();
 		}
 	}
 }
