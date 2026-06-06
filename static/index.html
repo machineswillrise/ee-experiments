@@ -8,8 +8,8 @@
 	<form id="orderForm" action="/orders" method="post">
 		<h1>Restaurant</h1>
 		<p>Welcome to our restaurant!</p>
-		<input type="text" id="customer" name="customer" placeholder="Customer">
-		<input type="text" id="product" name="product" placeholder="Product">
+		<input type="text" id="customer" name="customer" placeholder="Customer" required>
+		<input type="text" id="product" name="product" placeholder="Product" required>
 		<button type="submit">Add Order</button>
 		<button type="reset">Reset</button>
 		<ul id="orders"></ul>
