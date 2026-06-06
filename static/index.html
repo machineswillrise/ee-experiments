@@ -1,68 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Restaurant</title>
-    <link rel="stylesheet" href="style.css">
+	<title>Restaurant</title>
+	<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <form id="orderForm" action="/orders" method="post">
-        <h1>Restaurant</h1>
-        <p>Welcome to our restaurant!</p>
-        <input type="text" id="customer" name="customer" placeholder="Customer">
-        <input type="text" id="product" name="product" placeholder="Product">
-        <button type="submit">Add Order</button>
-        <button type="reset">Reset</button>
-        <ul id="orders"></ul>
-    </form>
-    
-    <script>
-        function fetchOrders() {
-            return fetch("/orders").then(response => response.json());
-        }
+	<form id="orderForm" action="/orders" method="post">
+		<h1>Restaurant</h1>
+		<p>Welcome to our restaurant!</p>
+		<input type="text" id="customer" name="customer" placeholder="Customer">
+		<input type="text" id="product" name="product" placeholder="Product">
+		<button type="submit">Add Order</button>
+		<button type="reset">Reset</button>
+		<ul id="orders"></ul>
+	</form>
+	
+	<script>
+		function fetchOrders() {
+			return fetch("/orders").then(response => response.json());
+		}
 
-        function renderOrders(orders) {
-            const ordersList = document.getElementById("orders");
-            ordersList.innerHTML = "";
-            for (const order of orders) {
-                const li = document.createElement("li");
-                li.textContent = `${order.customer} ordered ${order.product}`;
-                
-                const deleteBtn = document.createElement("img");
-                deleteBtn.src = "img/delete.png";
-                deleteBtn.style.width = "16px";
-                deleteBtn.style.height = "16px";
-                deleteBtn.style.cursor = "pointer";
-                deleteBtn.style.verticalAlign = "middle";
+		function renderOrders(orders) {
+			const ordersList = document.getElementById("orders");
+			ordersList.innerHTML = "";
+			for (const order of orders) {
+				const li = document.createElement("li");
+				li.textContent = `${order.customer} ordered ${order.product}`;
+				
+				const deleteBtn = document.createElement("img");
+				deleteBtn.src = "img/delete.png";
+				deleteBtn.style.width = "16px";
+				deleteBtn.style.height = "16px";
+				deleteBtn.style.cursor = "pointer";
+				deleteBtn.style.verticalAlign = "middle";
 
-                deleteBtn.addEventListener("click", () => {
-                    fetch(`/orders?customer=${order.customer}&product=${order.product}`, {
-                        method: "DELETE"
-                    })
-                    .then(fetchOrders)
-                    .then(renderOrders);
-                });
-                li.appendChild(deleteBtn);
-                
-                const span = document.createElement("span");
-                span.style.marginLeft = "5px";
-                span.appendChild(deleteBtn);
-                li.appendChild(span);
-                
-                ordersList.appendChild(li);
-            }
-        }
+				deleteBtn.addEventListener("click", () => {
+					fetch(`/orders?customer=${order.customer}&product=${order.product}`, {
+						method: "DELETE"
+					})
+					.then(fetchOrders)
+					.then(renderOrders);
+				});
+				li.appendChild(deleteBtn);
+				
+				const span = document.createElement("span");
+				span.style.marginLeft = "5px";
+				span.appendChild(deleteBtn);
+				li.appendChild(span);
+				
+				ordersList.appendChild(li);
+			}
+		}
 
-        const form = document.getElementById("orderForm");
-        form.addEventListener("submit", event => {
-            event.preventDefault();
-            const customer = document.getElementById("customer").value;
-            const product = document.getElementById("product").value;
-            fetch(`/orders?customer=${customer}&product=${product}`, {
-                method: "POST"
-            })
-            .then(fetchOrders)
-            .then(renderOrders);
-        });
-    </script>
+		const form = document.getElementById("orderForm");
+		form.addEventListener("submit", event => {
+			event.preventDefault();
+			const customer = document.getElementById("customer").value;
+			const product = document.getElementById("product").value;
+			fetch(`/orders?customer=${customer}&product=${product}`, {
+				method: "POST"
+			})
+			.then(fetchOrders)
+			.then(renderOrders);
+		});
+	</script>
 </body>
 </html>
