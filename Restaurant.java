@@ -69,27 +69,27 @@ class OrderServlet extends HttpServlet {
 		
 		resp.getWriter().println(html);
 	}
+}
 
-	public static class MyFilter implements Filter {
-		public MyFilter() {
-		}
+class MyFilter implements Filter {
+	public MyFilter() {
+	}
 
-		@Override
-		public void init(FilterConfig filterConfig) throws ServletException {
-			// ...
-		}
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
+		// ...
+	}
 
-		@Override
-		public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-		throws IOException, ServletException {
-			HttpServletResponse httpResponse = (HttpServletResponse) response;
-			chain.doFilter(request, httpResponse);
-		}
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+	throws IOException, ServletException {
+		HttpServletResponse httpResponse = (HttpServletResponse) response;
+		chain.doFilter(request, httpResponse);
+	}
 
-		@Override
-		public void destroy() {
-			// ...
-		}
+	@Override
+	public void destroy() {
+		// ...
 	}
 }
 
@@ -155,7 +155,7 @@ public class Restaurant {
 
 		try {
 			result = init(OrderServlet.class, ROUTE, PORT);
-			configureFilter(result, new OrderServlet.MyFilter(), ROUTE);
+			configureFilter(result, new MyFilter(), ROUTE);
 			server = result.getServer();
 		} catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
 			LOG.error("Jetty Configuration Error: " + e.getMessage());
