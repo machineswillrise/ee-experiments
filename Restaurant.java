@@ -8,7 +8,6 @@
 //DEPS org.xerial:sqlite-jdbc:3.50.2.0
 //DEPS jakarta.validation:jakarta.validation-api:3.1.1
 //DEPS org.hibernate.validator:hibernate-validator:8.0.2.Final
-//DEPS org.projectlombok:lombok:1.18.40
 //DEPS org.glassfish:jakarta.el:4.0.0
 
 import jakarta.servlet.ServletException;
@@ -43,8 +42,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
-
-import lombok.SneakyThrows;
 
 import org.apache.johnzon.mapper.Mapper;
 import org.apache.johnzon.mapper.MapperBuilder;
@@ -104,11 +101,7 @@ class OrderServlet extends HttpServlet {
 		stmt.setTimestamp(4, order.timestamp());
 	}
 
-	// these could normally either be propagated or handled, but the HttpServlet class
-	// requires them to only throw a certain set of exceptions and handling them
-	// would be verbose so @SneakyThrows is used
 	@Override
-	@SneakyThrows(SQLException.class)
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
@@ -121,6 +114,8 @@ class OrderServlet extends HttpServlet {
 						rs.getBigDecimal("price"), rs.getTimestamp("timestamp"))
 				);
 			}
+		} catch (SQLException e) {
+			throw new ServletException(e);
 		}
 		try (PrintWriter writer = resp.getWriter()) {
 			mapper.writeObject(orders, writer);
@@ -128,7 +123,6 @@ class OrderServlet extends HttpServlet {
 	}
 
 	@Override
-	@SneakyThrows(SQLException.class)
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
@@ -140,12 +134,13 @@ class OrderServlet extends HttpServlet {
 				"INSERT INTO orders (name, product, price, timestamp) VALUES (?, ?, ?, ?)")) {
 			setUpStmt(order, stmt);
 			stmt.execute();
+		} catch (SQLException e) {
+			throw new ServletException(e);
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
 	}
 
 	@Override
-	@SneakyThrows(SQLException.class)
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		Order order = extractFromParams(req);
@@ -157,6 +152,8 @@ class OrderServlet extends HttpServlet {
 				"DELETE FROM orders WHERE name = ? AND product = ? AND price = ? AND timestamp = ?")) {
 			setUpStmt(order, stmt);
 			stmt.execute();
+		} catch (SQLException e) {
+			throw new ServletException(e);
 		}
 		resp.setStatus(HttpServletResponse.SC_OK);
 	}
