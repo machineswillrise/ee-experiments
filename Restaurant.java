@@ -6,7 +6,7 @@
 //DEPS org.glassfish:jakarta.json:2.0.1
 //DEPS org.slf4j:slf4j-simple:2.0.16
 //DEPS org.xerial:sqlite-jdbc:3.50.2.0
-//DEPS jakarta.validation:jakarta.validation-api:3.1.1
+//DEPS jakarta.validation:jakarta.validation-api:3.0.2
 //DEPS org.hibernate.validator:hibernate-validator:8.0.2.Final
 //DEPS org.glassfish:jakarta.el:4.0.0
 
@@ -60,7 +60,7 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-record Order(@NotBlank String name, @NotBlank String product, @NotNull @Min(1)BigDecimal price, Timestamp timestamp) {}
+record Order(Long id, @NotBlank String name, @NotBlank String product, @NotNull @Min(1)BigDecimal price, Timestamp timestamp) {}
 
 class OrderServlet extends HttpServlet {
 	private final Connection connection;
@@ -71,18 +71,6 @@ class OrderServlet extends HttpServlet {
 
 	public OrderServlet(Connection connection) {
 		this.connection = connection;
-	}	
-
-	private Order extractFromParams(HttpServletRequest req) {
-		String name = req.getParameter("name");
-		String product = req.getParameter("product");
-		BigDecimal price = new BigDecimal(req.getParameter("price"));
-
-		long timestampMillis = Long.parseLong(req.getParameter("timestamp"));
-		Timestamp timestamp = new Timestamp(timestampMillis);
-		Order order = new Order(name, product, price, timestamp);
-
-		return order;
 	}
 
 	private boolean validate(Order order, HttpServletResponse response) {
@@ -94,23 +82,16 @@ class OrderServlet extends HttpServlet {
 		return true;
 	}
 
-	private void setUpStmt(Order order, PreparedStatement stmt) throws SQLException {
-		stmt.setString(1, order.name());
-		stmt.setString(2, order.product());
-		stmt.setBigDecimal(3, order.price());
-		stmt.setTimestamp(4, order.timestamp());
-	}
-
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
 		resp.setContentType("application/json");
 		List<Order> orders = new ArrayList<>();
-		try (PreparedStatement stmt = connection.prepareStatement("SELECT name, product, price, timestamp FROM orders");
+		try (PreparedStatement stmt = connection.prepareStatement("SELECT id, name, product, price, timestamp FROM orders");
 			ResultSet rs = stmt.executeQuery()) {
 			while (rs.next()) {
 				orders.add(
-					new Order(rs.getString("name"), rs.getString("product"),
+					new Order(rs.getLong("id"), rs.getString("name"), rs.getString("product"),
 						rs.getBigDecimal("price"), rs.getTimestamp("timestamp"))
 				);
 			}
@@ -125,14 +106,31 @@ class OrderServlet extends HttpServlet {
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
-		Order order = extractFromParams(req);
+		String name = req.getParameter("name");
+		String product = req.getParameter("product");
+
+		BigDecimal price;
+		try {
+			price = new BigDecimal(req.getParameter("price"));
+		} catch (NumberFormatException | NullPointerException e) {
+			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid price");
+			return;
+		}
+
+		// Server sets the timestamp — never trust the client for this
+		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+
+		Order order = new Order(null, name, product, price, timestamp);
 		if (!validate(order, resp)) {
 			return;
 		}
 
 		try (PreparedStatement stmt = connection.prepareStatement(
 				"INSERT INTO orders (name, product, price, timestamp) VALUES (?, ?, ?, ?)")) {
-			setUpStmt(order, stmt);
+			stmt.setString(1, order.name());
+			stmt.setString(2, order.product());
+			stmt.setBigDecimal(3, order.price());
+			stmt.setTimestamp(4, order.timestamp());
 			stmt.execute();
 		} catch (SQLException e) {
 			throw new ServletException(e);
@@ -143,15 +141,28 @@ class OrderServlet extends HttpServlet {
 	@Override
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
 	throws ServletException, IOException {
-		Order order = extractFromParams(req);
-		if (!validate(order, resp)) {
+		String idParam = req.getParameter("id");
+		if (idParam == null) {
+			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing id parameter");
+			return;
+		}
+
+		long id;
+		try {
+			id = Long.parseLong(idParam);
+		} catch (NumberFormatException e) {
+			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid id");
 			return;
 		}
 
 		try (PreparedStatement stmt = connection.prepareStatement(
-				"DELETE FROM orders WHERE name = ? AND product = ? AND price = ? AND timestamp = ?")) {
-			setUpStmt(order, stmt);
-			stmt.execute();
+				"DELETE FROM orders WHERE id = ?")) {
+			stmt.setLong(1, id);
+			int affected = stmt.executeUpdate();
+			if (affected == 0) {
+				resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Order not found");
+				return;
+			}
 		} catch (SQLException e) {
 			throw new ServletException(e);
 		}

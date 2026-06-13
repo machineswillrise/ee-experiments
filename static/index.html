@@ -36,25 +36,23 @@
 					${order.name} ordered ${order.product} - $${order.price} at ${getTimestamp(order)}
 				`;
 				
+				const span = document.createElement("span");
+				span.style.marginLeft = "5px";
 				const deleteBtn = document.createElement("img");
 				deleteBtn.src = "img/delete.png";
 				deleteBtn.style.width = "16px";
 				deleteBtn.style.height = "16px";
 				deleteBtn.style.cursor = "pointer";
 				deleteBtn.style.verticalAlign = "middle";
+				deleteBtn.alt = "Delete order";
 
 				deleteBtn.addEventListener("click", () => {
-					const timestamp = order.timestamp.time;
-					fetch(`/orders?name=${order.name}&product=${order.product}&price=${order.price}&timestamp=${timestamp}`, {
+					fetch(`/orders?id=${order.id}`, {
 						method: "DELETE"
 					})
 					.then(fetchOrders)
 					.then(renderOrders);
 				});
-				li.appendChild(deleteBtn);
-				
-				const span = document.createElement("span");
-				span.style.marginLeft = "5px";
 				span.appendChild(deleteBtn);
 				li.appendChild(span);
 				
@@ -68,9 +66,9 @@
 			const name = document.getElementById("name").value;
 			const product = document.getElementById("product").value;
 			const price = document.getElementById("price").value;
-			const now = new Date().getTime();
 
-			fetch(`/orders?name=${name}&product=${product}&price=${price}&timestamp=${now}`, {
+			// No timestamp sent to server — server sets it
+			fetch(`/orders?name=${name}&product=${product}&price=${price}`, {
 				method: "POST"
 			})
 			.then(fetchOrders)
